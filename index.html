@@ -3,476 +3,1035 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>猜猜我是誰 - 團體互動遊戲</title>
-    
-    <!-- 引入 Tailwind CSS (樣式) -->
+    <title>長者運動大富翁 - LLM整合版</title>
+    <!-- 載入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 引入 React 和 ReactDOM (核心框架) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- 引入 Babel (讓瀏覽器看懂 JSX) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
+    <!-- 載入 Lucide Icons (用於遊戲圖標) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* 自定義動畫 */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-up {
-            animation: fadeIn 0.5s ease-out forwards;
-        }
+        /* 使用 Google Noto Sans TC 作為主要字體 */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body {
-            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
-            background-color: #f3f4f6;
+            font-family: 'Noto+Sans+TC', sans-serif;
+            background-color: #e0f2fe; /* 淺藍色背景，活潑基調 */
+        }
+        /* 棋盤整體樣式 */
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr); /* 6x6 佈局 */
+            grid-template-rows: repeat(6, 1fr); /* 6x6 佈局 */
+            gap: 6px; /* 增加間隙 */
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+            border: 16px solid #1e40af; /* 深藍色邊框 */
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+        }
+        /* 棋盤格子樣式 - 包含顏色變數 */
+        .board-square {
+            min-height: 120px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 8px;
+            text-align: center;
+            border: 3px solid; /* 加粗邊框 */
+            transition: all 0.3s;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden; 
+        }
+        /* 格子編號樣式 - 提高可見度 */
+        .board-square .square-number {
+            position: absolute; 
+            top: 4px; 
+            left: 4px; 
+            font-size: 1.5rem; /* 加大字體 */
+            font-weight: 900; /* 極粗字體 */
+            color: rgba(26, 32, 44, 0.9); /* 深色文字 */
+            text-shadow: 1px 1px 0 #fff; /* 白色陰影增加對比 */
+        }
+        /* 高亮顯示當前格 */
+        .board-square.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 1); /* 明亮的黃色光暈 */
+            z-index: 10;
+        }
+        /* 中間控制區塊 */
+        .center-control-block {
+            /* 使用 grid-area 明確佔據 4x4 區域 */
+            grid-area: 2 / 2 / 6 / 6; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff; 
+            color: #3b82f6;
+            border-radius: 2rem; 
+            padding: 3rem; 
+            text-align: center;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            border: 8px dashed #a5b4fc; /* 虛線邊框 */
+        }
+
+        /* 棋子標記 (Marker) - 使用更飽和的顏色 */
+        .marker {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            border: 4px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.8);
+            z-index: 15;
+            transition: all 0.5s ease-in-out;
+            opacity: 0.9;
+        }
+        .marker.group-1 { background-color: #ef4444; } /* Vibrant Red */
+        .marker.group-2 { background-color: #3b82f6; } /* Vibrant Blue */
+        .marker.group-3 { background-color: #10b981; } /* Vibrant Green */
+        .marker.group-4 { background-color: #f97316; } /* Vibrant Orange */
+
+        /* 骰子視覺化樣式 (改為顯示數字) */
+        .dice-face {
+            width: 100px;
+            height: 100px;
+            background-color: #fff;
+            border-radius: 20px;
+            border: 5px solid #1e40af;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            /* 使用 flex 居中顯示數字 */
+            display: flex; 
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            transition: transform 0.3s ease-out;
+            /* 移除舊的點數 grid 樣式 */
+        }
+        
+        /* 骰子動畫 */
+        @keyframes rollDice {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(360deg) scale(1.1); }
+            100% { transform: rotate(720deg) scale(1); }
+        }
+        .dice-rolling {
+            animation: rollDice 0.5s ease-in-out 3;
         }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="p-4 md:p-8 min-h-screen">
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+    <div id="setup-screen" class="max-w-xl mx-auto p-8 bg-white rounded-xl shadow-2xl transition-opacity duration-500 border-t-8 border-blue-500">
+        <h1 class="text-4xl font-extrabold text-blue-600 mb-6 text-center">🏆 長者運動大富翁 遊戲設定</h1>
+        <p class="text-xl text-gray-600 mb-6 text-center">請輸入參與遊戲的分組名稱，至少需要兩組。</p>
+        
+        <div id="group-inputs" class="space-y-4 mb-6">
+            <div class="flex space-x-2">
+                <input type="text" id="group-1" value="活力紅組" placeholder="分組 1 名稱" class="text-lg flex-grow p-4 border border-red-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+                <input type="text" id="group-2" value="健康藍組" placeholder="分組 2 名稱" class="text-lg flex-grow p-4 border border-blue-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex space-x-2">
+                <input type="text" id="group-3" value="快樂綠組" placeholder="分組 3 名稱 (可選)" class="text-lg flex-grow p-4 border border-green-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                <input type="text" id="group-4" value="陽光橙組" placeholder="分組 4 名稱 (可選)" class="text-lg flex-grow p-4 border border-yellow-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
+            </div>
+        </div>
 
-        // --- 圖示組件 ---
-        const IconBase = ({ size = 24, className = "", children }) => (
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width={size} 
-                height={size} 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className={className}
-            >
-                {children}
-            </svg>
-        );
+        <button onclick="startGame()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-4 text-xl rounded-xl transition duration-300 shadow-xl transform hover:scale-[1.01]">
+            開始遊戲！
+        </button>
+        <p id="setup-error" class="text-red-600 text-xl text-center mt-3 hidden">請至少輸入兩個有效的組名。</p>
+    </div>
 
-        const HelpCircle = (props) => (
-            <IconBase {...props}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></IconBase>
-        );
-        const ImageIcon = (props) => (
-            <IconBase {...props}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></IconBase>
-        );
-        const CheckCircle = (props) => (
-            <IconBase {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></IconBase>
-        );
-        const ArrowRight = (props) => (
-            <IconBase {...props}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></IconBase>
-        );
-        const RotateCcw = (props) => (
-            <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/></IconBase>
-        );
-        const Eye = (props) => (
-            <IconBase {...props}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></IconBase>
-        );
-        const Play = (props) => (
-            <IconBase {...props}><polygon points="5 3 19 12 5 21 5 3"/></IconBase>
-        );
-        const Star = (props) => (
-            <IconBase {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></IconBase>
-        );
-        const Maximize = (props) => (
-            <IconBase {...props}><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></IconBase>
-        );
-        const Minimize = (props) => (
-            <IconBase {...props}><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></IconBase>
-        );
-        const Volume2 = (props) => (
-            <IconBase {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></IconBase>
-        );
-        const VolumeX = (props) => (
-            <IconBase {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></IconBase>
-        );
+    <div id="game-screen" class="hidden">
+        <header class="mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-xl shadow-2xl border-t-8 border-blue-500">
+            <h1 class="text-4xl font-extrabold text-blue-700 mb-3 md:mb-0">🎲 運動大富翁</h1>
+            <div id="current-turn-display" class="text-2xl font-black p-3 rounded-xl bg-amber-400 text-amber-900 shadow-md">
+                目前輪到：<span id="current-group-name" class="text-amber-950"></span>
+            </div>
+        </header>
 
-        // --- 主程式邏輯 ---
-        const GuessWhoGame = () => {
-            // 遊戲資料設定
-            const gameData = [
-                {
-                    id: 1,
-                    name: "金城武",
-                    photos: [
-                        { url: "https://megapx-assets.dcard.tw/images/2e1a59a8-5f95-447e-8e6d-c0d30c5f7d8e/640.jpeg", label: "題目：過去照片 (1)" },
-                        { url: "https://www.juksy.com/api/image/webp?source=https://assets.juksy.com/files/articles/129473/672edcde9b8df.jpg", label: "提示 1：過去照片 (2)" },
-                        { url: "https://cdn-cw1.cw.com.tw/images/article/C1418099648229.jpg", label: "提示 2：現在照片" }
-                    ]
-                },
-                {
-                    id: 2,
-                    name: "楊林",
-                    photos: [
-                        { url: "https://g.udn.com.tw/upfiles/B_OR/OrientExpress/PSN_PHOTO/802/f_28828802_1.jpg", label: "題目：過去照片 (1)" },
-                        { url: "https://i.ytimg.com/vi/sp4ff1RMxJA/sddefault.jpg", label: "提示 1：過去照片 (2)" },
-                        { url: "https://d1vvo51t6lqxtd.cloudfront.net/rss/20200722/b4117159910940122dc5d0dbd39e6a99.jpg", label: "提示 2：現在照片" }
-                    ]
-                },
-                {
-                    id: 3,
-                    name: "張晨光",
-                    photos: [
-                        { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTdfy7AdtcrAA7VYMNyTeLJFQT4V3vabEiKmw&s", label: "題目：過去照片 (1)" },
-                        { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTRmPNNy-lQxApfdcCRkk6rl9AmFOpDVmI5Xg&s", label: "提示 1：過去照片 (2)" },
-                        { url: "https://v3-statics.mirrormedia.mg/images/20210329172012-0810db9e002a85e394b35e857741c471-w1600.webP", label: "提示 2：現在照片" }
-                    ]
-                },
-                {
-                    id: 4,
-                    name: "陳美鳳",
-                    photos: [
-                        { url: "https://images.chinatimes.com/newsphoto/2024-09-25/656/20240925005111.jpg", label: "題目：過去照片 (1)" },
-                        { url: "https://static.ctwant.com/images/content/15/55515/ab92bd2af7d9b1426d06a79f685dc226.jpg", label: "提示 1：過去照片 (2)" },
-                        { url: "https://images.chinatimes.com/newsphoto/2023-08-24/1024/20230824002059.jpg", label: "提示 2：現在照片" }
-                    ]
-                },
-                {
-                    id: 5,
-                    name: "張惠妹",
-                    photos: [
-                        { url: "https://resize-image.vocus.cc/resize?compression=6&norotation=true&url=https%3A%2F%2Fimages.vocus.cc%2Fec998dd5-ad49-4ee8-899f-ffc5e67ab43b.png&width=740&sign=uu-Vso-piL8EjQ5QjovHi6OkkfjZV6cgzwCs3HOKxIk", label: "題目：過去照片 (1)" },
-                        { url: "https://p3-pc-sign.douyinpic.com/tos-cn-i-0813/oAZAAa9DAEB5i6iEATQzCQ9iPaEIAviIUjWpA~tplv-dy-aweme-images:q75.webp?biz_tag=aweme_images&from=327834062&lk3s=138a59ce&s=PackSourceEnum_SEARCH&sc=image&se=false&x-expires=1768071600&x-signature=9B6PFgpPjQbXN%2BKrviesIDkMJSA%3D", label: "提示 1：過去照片 (2)" },
-                        { url: "https://iam.marieclaire.com.tw/s1200c675h100b0webp100/assets/mc/202511/690B0F4697A281762332486.jpeg", label: "提示 2：現在照片" }
-                    ]
-                },
-                {
-                    id: 6,
-                    name: "葉全真",
-                    photos: [
-                        { url: "https://p3-pc-sign.douyinpic.com/tos-cn-i-0813/ooixKNAfAfmAfeJDBBefyeuAE6BxAEauuZfE7Af~tplv-dy-aweme-images:q75.webp?biz_tag=aweme_images&from=327834062&lk3s=138a59ce&s=PackSourceEnum_SEARCH&sc=image&se=false&x-expires=1768136400&x-signature=fXoIE%2FYogcwofFhal5049mUqxPk%3D", label: "題目：過去照片 (1)" },
-                        { url: "https://www.popdaily.com.tw/shaper/wp-content/uploads/2023/12/9tjakf2sqakg8owsggc408k08s6d9d6.jpeg?resize-w=1700&resize-h=968&format=webp", label: "提示 1：過去照片 (2)" },
-                        { url: "https://media.nownews.com/nn_media/thumbnail/2025/09/1758695358375-a8cf895c314d44a99233f7057d7ea7a5-800x451.webp?unShow=false", label: "提示 2：現在照片" }
-                    ]
-                },
-                {
-                    id: 7,
-                    name: "譚艾珍",
-                    photos: [
-                        { url: "https://static.ctwant.com/images/content/43/56643/e515c751d9790b3b7f8070971c97e9f6.jpg", label: "題目：過去照片 (1)" },
-                        { url: "https://img.ltn.com.tw/Upload/ent/page/800/2015/05/11/phpKLAEbA.jpg", label: "提示 1：過去照片 (2)" },
-                        { url: "https://static.tvbs.com.tw/health2.0/images/uploads/2024/12/20241217160929-tsEPrNk0.jpg", label: "提示 2：現在照片" }
-                    ]
-                },
-                {
-                    id: 8,
-                    name: "顧寶明",
-                    photos: [
-                        { url: "https://i1.kknews.cc/rQblo5VmXal2DJDT3aHyEcNefDl4c1M8HA/0.jpg", label: "題目：過去照片 (1)" },
-                        { url: "https://pgw.udn.com/gw/photo.php?u=https://uc.udn.com.tw/photo/2023/03/15/0/20639238.png&x=0&y=0&sw=0&sh=0&exp=3600", label: "提示 1：過去照片 (2)" },
-                        { url: "https://v3-statics.mirrormedia.mg/images/20230313175709-54f48cc7527b03277e4ca036d3265f8a-w1600.jpg", label: "提示 2：現在照片" }
-                    ]
-                },
-                // 新增 賀一航 題目
-                {
-                    id: 9,
-                    name: "賀一航",
-                    photos: [
-                        // 替換不穩定的 Google 轉址連結
-                        { url: "https://pgw.udn.com.tw/gw/photo.php?u=https://uc.udn.com.tw/photo/2021/04/12/0/11832047.jpg&x=0&y=0&sw=0&sh=0&sl=W&fw=1050&exp=3600", label: "題目：過去照片 (1) [年輕時期]" }, 
-                        { url: "https://attach.setn.com/newsimages/2015/07/29/308224.jpg", label: "提示 1：過去照片 (2) [中期]" },
-                        { url: "https://attach.setn.com/newsimages/2019/06/04/1956258-PH.jpg", label: "提示 2：現在照片 [近期]" }
-                    ]
-                }
-            ];
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- 棋盤區 (大富翁地圖) -->
+            <div class="lg:col-span-2">
+                <div id="game-board" class="board-grid mx-auto max-w-4xl">
+                    <!-- 棋盤格子和中央骰子控制台將由 JS 動態生成 -->
+                </div>
+            </div>
 
-            // 狀態管理
-            const [currentRound, setCurrentRound] = useState(0);
-            const [step, setStep] = useState(0);
-            const [gameStatus, setGameStatus] = useState('start');
-            const [isFullscreen, setIsFullscreen] = useState(false);
-            const [isMusicPlaying, setIsMusicPlaying] = useState(true); // 音樂預設開啟狀態
-            const audioRef = useRef(null);
-
-            const currentCelebrity = gameData[currentRound];
-
-            // --- 音樂功能 (改用 HTML5 Audio 以解決 YouTube 錯誤) ---
-            useEffect(() => {
-                // 使用 Internet Archive 的穩定 MP3 連結 (Erik Satie - Gymnopédie No.1)
-                audioRef.current = new Audio("https://ia800504.us.archive.org/33/items/ErikSatieGymnopedieNo1/ErikSatieGymnopedieNo1.mp3");
-                audioRef.current.loop = true;
-                audioRef.current.volume = 0.5;
+            <!-- 控制面板與分數區 -->
+            <div class="lg:col-span-1 space-y-6">
                 
-                // 清理函數
-                return () => {
-                    if (audioRef.current) {
-                        audioRef.current.pause();
-                        audioRef.current = null;
-                    }
-                };
-            }, []);
+                <!-- 遊戲控制區 - 訊息顯示 -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-4 flex items-center">
+                        <i data-lucide="message-square" class="w-8 h-8 mr-2 text-blue-500"></i>
+                        遊戲訊息
+                    </h2>
+                    <p id="game-message" class="text-center h-10 text-xl font-black text-gray-700">準備開始遊戲！</p>
+                    <!-- LLM 教練回饋將顯示在這裡 -->
+                    <div id="control-panel-message" class="text-lg mt-4 text-center text-gray-500">請在中央按鈕處擲骰。</div>
+                </div>
 
-            const toggleMusic = () => {
-                if (!audioRef.current) return;
-                
-                if (isMusicPlaying) {
-                    audioRef.current.pause();
-                } else {
-                    audioRef.current.play().catch(e => console.log("Audio play error:", e));
-                }
-                setIsMusicPlaying(!isMusicPlaying);
-            };
-
-            const handleStartGame = () => {
-                setGameStatus('playing');
-                // 使用者互動後，播放音樂
-                if (audioRef.current) {
-                    audioRef.current.play().catch(e => {
-                        console.log("Auto-play prevented:", e);
-                        setIsMusicPlaying(false); // 如果自動播放失敗，更新狀態為暫停
-                    });
-                }
-            };
-
-            // --- 全螢幕功能 ---
-            const toggleFullScreen = () => {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().catch(err => {
-                        console.log(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-                    });
-                } else {
-                    if (document.exitFullscreen) {
-                        document.exitFullscreen();
-                    }
-                }
-            };
-
-            useEffect(() => {
-                const handleFullscreenChange = () => {
-                    setIsFullscreen(!!document.fullscreenElement);
-                };
-
-                document.addEventListener('fullscreenchange', handleFullscreenChange);
-                return () => {
-                    document.removeEventListener('fullscreenchange', handleFullscreenChange);
-                };
-            }, []);
-
-            // --- 遊戲邏輯 ---
-            const handleNextStep = () => {
-                if (step < 2) {
-                    setStep(step + 1);
-                }
-            };
-
-            const handleReveal = () => {
-                setStep(3);
-            };
-
-            const handleNextRound = () => {
-                if (currentRound < gameData.length - 1) {
-                    setCurrentRound(currentRound + 1);
-                    setStep(0);
-                } else {
-                    setGameStatus('finished');
-                }
-            };
-
-            const handleRestart = () => {
-                setCurrentRound(0);
-                setStep(0);
-                setGameStatus('playing');
-            };
-
-            const renderControls = () => {
-                if (step < 2) {
-                    return (
-                        <div className="grid grid-cols-1 gap-4 mt-4">
-                            <button
-                                onClick={handleNextStep}
-                                className="flex items-center justify-center gap-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-bold py-4 px-6 rounded-xl transition border border-yellow-300 text-lg shadow-sm"
-                            >
-                                <Eye size={24} />
-                                {step === 0 ? "下一個提示（看過去照片 2）" : "下一個提示（看現在照片）"}
-                            </button>
-                            
-                            <button
-                                onClick={handleReveal}
-                                className="flex items-center justify-center gap-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold py-4 px-6 rounded-xl transition border border-red-300 text-lg mt-2 shadow-sm"
-                            >
-                                <HelpCircle size={24} />
-                                直接公佈答案
-                            </button>
-                        </div>
-                    );
-                }
-                
-                if (step === 2) {
-                    return (
-                        <div className="grid grid-cols-1 gap-4 mt-4">
-                            <div className="text-center text-gray-500 font-bold mb-2 animate-pulse">
-                                已經是最後一張提示囉！大家猜到了嗎？
-                            </div>
-                            <button
-                                onClick={handleReveal}
-                                className="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white font-bold py-5 px-6 rounded-xl shadow-lg transition transform hover:scale-105 text-2xl"
-                            >
-                                <Star size={28} className="fill-current" />
-                                公佈答案
-                            </button>
-                        </div>
-                    );
-                }
-
-                return (
-                    <div className="text-center animate-fade-in-up">
-                        <h2 className="text-3xl font-bold text-gray-800 mb-2">答案是：{currentCelebrity.name}</h2>
-                        <p className="text-gray-500 mb-6">大家猜對了嗎？</p>
-                        
-                        <button
-                            onClick={handleNextRound}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white text-xl font-bold py-4 px-6 rounded-xl shadow-lg transition transform hover:scale-105 flex items-center justify-center gap-2"
-                        >
-                            {currentRound < gameData.length - 1 ? "下一題" : "查看成績"} <ArrowRight size={24} />
-                        </button>
+                <!-- 分數排行榜 -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-red-500">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-4 flex items-center">
+                        <i data-lucide="trophy" class="w-8 h-8 mr-2 text-yellow-500"></i>
+                        分數排行榜
+                    </h2>
+                    <div id="score-board" class="space-y-3">
+                        <!-- 分數列表將由 JS 動態生成 -->
                     </div>
-                );
-            };
+                </div>
+            </div>
+        </div>
+    </div>
 
-            // --- 畫面渲染 ---
+    <!-- 攻擊卡片 - 目標選擇模態視窗 -->
+    <div id="attack-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
+        <div id="attack-modal-content" class="modal-content bg-white p-8 rounded-3xl shadow-2xl max-w-lg w-full border-t-8 border-red-500 text-center">
+            <!-- 內容由 JS 動態生成 -->
+        </div>
+    </div>
 
-            // 音樂控制按鈕與全螢幕按鈕共用區塊
-            const TopRightControls = ({ isDarkBg }) => (
-                <div className="absolute top-4 right-4 flex gap-2 z-50">
-                     <button 
-                        onClick={toggleMusic}
-                        className={`p-2 rounded-full transition shadow-sm backdrop-blur-sm ${isDarkBg ? 'bg-white/20 text-white hover:bg-white/40' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                        title={isMusicPlaying ? "關閉音樂" : "開啟音樂"}
-                    >
-                        {isMusicPlaying ? <Volume2 size={24} /> : <VolumeX size={24} />}
+    <!-- 任務/模態視窗 -->
+    <div id="task-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
+        <div class="modal-content bg-white p-8 rounded-3xl shadow-2xl max-w-xl w-full border-t-8 border-purple-500">
+            <h2 class="text-4xl font-extrabold text-purple-600 mb-4 flex items-center">
+                <i data-lucide="zap" class="w-8 h-8 mr-2 text-yellow-500"></i>
+                <span id="task-title">✨ AI 任務挑戰</span>
+            </h2>
+            <p class="text-xl text-gray-700 mb-4">目標地點：<span id="landed-square-name" class="font-bold text-blue-600"></span></p>
+            
+            <div id="task-loading" class="text-center py-6">
+                <svg class="animate-spin h-10 w-10 text-purple-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="mt-4 text-xl font-medium text-purple-500">AI 正在為您生成互動運動任務，請稍候...</p>
+            </div>
+
+            <div id="task-content" class="hidden">
+                <p class="text-2xl font-black text-gray-800 mb-6 border-l-8 border-purple-500 pl-4 italic bg-purple-50 p-3 rounded-lg" id="task-instruction">任務說明將在此處顯示。</p>
+                <p class="text-3xl font-black text-green-600 mb-6 flex justify-between items-center bg-green-50 p-3 rounded-lg">
+                    <span>可獲得分數：</span><span id="task-points" class="text-4xl">0</span> 
+                    <i data-lucide="zap" class="w-6 h-6 text-green-500"></i>
+                </p>
+                
+                <h3 class="text-xl font-semibold text-gray-600 mb-3">✅ 任務完成了嗎？ (由老師/帶領者確認)</h3>
+                <div class="flex space-x-4">
+                    <button onclick="completeTask(true)" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-4 text-xl rounded-xl transition duration-300 shadow-lg transform hover:scale-105">
+                        成功完成 (加分)
                     </button>
-                    <button 
-                        onClick={toggleFullScreen}
-                        className={`p-2 rounded-full transition shadow-sm backdrop-blur-sm ${isDarkBg ? 'bg-white/20 text-white hover:bg-white/40' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                        title={isFullscreen ? "退出全螢幕" : "全螢幕"}
-                    >
-                        {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
+                    <button onclick="completeTask(false)" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-4 text-xl rounded-xl transition duration-300 shadow-lg transform hover:scale-105">
+                        無法完成 (不加分)
                     </button>
                 </div>
-            );
+            </div>
+            <p id="task-error-message" class="text-red-600 text-xl text-center mt-4 hidden">任務生成失敗，請再試一次。</p>
+        </div>
+    </div>
 
-            // 依據狀態渲染不同的畫面
-            const renderScreen = () => {
-                if (gameStatus === 'start') {
-                    return (
-                        <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4 relative overflow-hidden">
-                            <TopRightControls isDarkBg={true} />
-                            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center z-10">
-                                <HelpCircle className="w-20 h-20 text-indigo-500 mx-auto mb-6" />
-                                <h1 className="text-4xl font-bold text-gray-800 mb-4">猜猜我是誰？</h1>
-                                <p className="text-gray-600 mb-8 text-lg">
-                                    這是一個團體互動遊戲！
-                                    <br />
-                                    我們會展示明星過去的照片，大家一起猜猜看是誰！
-                                </p>
-                                <button 
-                                    onClick={handleStartGame}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xl font-bold py-4 px-6 rounded-xl transition transform hover:scale-105 flex items-center justify-center gap-2"
-                                >
-                                    <Play size={24} /> 開始遊戲
-                                </button>
-                            </div>
-                        </div>
-                    );
+    <!-- 遊戲結束模態視窗 -->
+    <div id="game-over-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center p-4 z-50">
+        <div class="modal-content bg-white p-10 rounded-3xl shadow-2xl max-w-lg w-full text-center border-t-8 border-yellow-500">
+            <h2 class="text-6xl font-extrabold text-red-600 mb-4">遊戲結束！🎉</h2>
+            <p class="text-3xl text-gray-700 mb-6 font-semibold">最終結果出爐！</p>
+            <div id="final-winner" class="text-4xl font-black text-green-700 mb-8 p-6 bg-green-100 rounded-xl shadow-inner border border-green-300">
+                <!-- 贏家資訊 -->
+            </div>
+            <button onclick="window.location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-10 text-xl rounded-xl transition duration-300 shadow-2xl transform hover:scale-[1.05]">
+                重新開始遊戲
+            </button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // =================================================================
+        // 🔥 Firebase & API Configuration (DO NOT CHANGE)
+        // =================================================================
+        const apiKey = ""; // Canvas will provide the key at runtime
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+        // 安全地獲取 Lucide Icons 的映射表，用於動態生成 SVG
+        const iconMap = (typeof lucide !== 'undefined' && lucide.icons) ? lucide.icons : {};
+
+        // =================================================================
+        // 🛠️ Utility Functions
+        // =================================================================
+
+        /**
+         * 執行帶有指數退避的 API 呼叫。
+         * @param {Object} payload API 請求的內容。
+         * @param {number} maxRetries 最大重試次數。
+         * @returns {Promise<Object>} API 響應的 JSON 物件。
+         */
+        async function fetchWithRetry(payload, maxRetries = 3) {
+            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            let attempt = 0;
+            while (attempt < maxRetries) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 429 && attempt < maxRetries - 1) {
+                            // 遇到限速，進行重試
+                            const waitTime = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                            console.warn(`API 限速 (429)。嘗試重試 ${attempt + 1}/${maxRetries}，等待 ${Math.round(waitTime / 1000)}s...`);
+                            await delay(waitTime);
+                            attempt++;
+                            continue;
+                        }
+                        throw new Error(`API 請求失敗，狀態碼: ${response.status}`);
+                    }
+                    return await response.json();
+
+                } catch (error) {
+                    console.error("API 呼叫時發生錯誤:", error.message);
+                    if (attempt === maxRetries - 1) throw error; // 最後一次嘗試失敗
+                    attempt++;
+                    const waitTime = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                    await delay(waitTime);
                 }
+            }
+        }
+        
+        // =================================================================
+        // 🎯 Game State and Data
+        // =================================================================
 
-                if (gameStatus === 'finished') {
-                    return (
-                        <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4 relative">
-                            <TopRightControls isDarkBg={true} />
-                            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-                                <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-6" />
-                                <h1 className="text-3xl font-bold text-gray-800 mb-4">遊戲結束！</h1>
-                                <p className="text-gray-600 mb-8">所有的題目都已經猜完囉。</p>
-                                <button 
-                                    onClick={handleRestart}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xl font-bold py-3 px-6 rounded-xl transition flex items-center justify-center gap-2"
-                                >
-                                    <RotateCcw size={24} /> 再玩一次
-                                </button>
-                            </div>
-                        </div>
-                    );
-                }
+        let groups = [];
+        let currentGroupIndex = 0;
+        let isDiceRolled = false;
+        let currentTask = null; // 儲存當前任務資訊 {taskName, instruction, points}
+        
+        // 卡片效果狀態 (新增)
+        let activeEffects = []; // Array of { groupId: number, type: 'speed_limit', value: 5 }
+        let isDoublePointsActive = false; // 特殊卡效果：下一回合任務分數加倍
+        const MAX_DICE_ROLL = 19; // 基礎擲骰上限 (步數上限)
 
-                // Playing State
-                return (
-                    <div className="min-h-screen bg-gray-100 flex flex-col items-center py-8 px-4 font-sans relative">
-                        <TopRightControls isDarkBg={false} />
+        // 棋盤格子定義 (20 個格子)
+        const gameBoard = [
+            { name: "起點 (Start)", type: "start", icon: "home" }, // Index 0
+            { name: "伸展區 (Stretch)", type: "task", icon: "maximize" },
+            { name: "運氣格 (Luck)", type: "task", icon: "star" },
+            { name: "反應力 (Reaction)", type: "task", icon: "activity" },
+            { name: "休息站 (Rest)", type: "rest", icon: "coffee" },
+            { name: "平衡挑戰 (Balance)", type: "task", icon: "scale" }, 
+            { name: "活力站 (Vitality)", type: "task", icon: "smile" }, // Index 6
+            { name: "記憶力 (Memory)", type: "task", icon: "brain" },
+            { name: "機會卡 (Chance)", type: "task", icon: "shuffle" }, // 會觸發卡片獲得
+            { name: "體適能 (Fitness)", type: "task", icon: "dumbbell" }, // Index 9
+            { name: "核心訓練 (Core)", type: "task", icon: "hexagon" }, // Index 10
+            { name: "運氣格 (Luck)", type: "task", icon: "star" },
+            { name: "呼吸訓練 (Breath)", type: "task", icon: "wind" },
+            { name: "健康加分 (Bonus)", type: "bonus", icon: "plus" },
+            { name: "肌力訓練 (Strength)", type: "task", icon: "armchair" },
+            { name: "休息站 (Rest)", type: "rest", icon: "coffee" }, // Index 15
+            { name: "反應力 (Reaction)", type: "task", icon: "activity" },
+            { name: "平衡挑戰 (Balance)", type: "task", icon: "scale" },
+            { name: "伸展區 (Stretch)", type: "task", icon: "maximize" },
+            { name: "回起點 (Go Home)", type: "task", icon: "home" }, // Index 19
+        ];
 
-                        <div className="w-full max-w-lg mb-6 flex justify-between items-center text-gray-500 font-medium mt-8 sm:mt-0">
-                            <span>第 {currentRound + 1} 題 / 共 {gameData.length} 題</span>
-                            <button 
-                                onClick={() => setGameStatus('start')} 
-                                className="text-sm hover:text-indigo-600 underline"
-                            >
-                                回首頁
-                            </button>
-                        </div>
 
-                        <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
-                            <div className="relative bg-gray-900 h-96 w-full flex items-center justify-center group">
-                                <img 
-                                    src={currentCelebrity.photos[Math.min(step, 2)].url} 
-                                    alt="Celebrity" 
-                                    className="w-full h-full object-contain transition-opacity duration-500"
-                                />
-                                
-                                <div className="absolute top-4 left-4 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-bold backdrop-blur-sm flex items-center gap-2">
-                                    <ImageIcon size={16} />
-                                    {currentCelebrity.photos[Math.min(step, 2)].label}
-                                </div>
+        // =================================================================
+        // 🎨 UI Rendering Functions
+        // =================================================================
 
-                                {step === 3 && (
-                                    <div className="absolute inset-0 bg-black/40 flex items-end justify-center pb-10">
-                                        <div className="bg-green-500 text-white text-4xl font-bold px-8 py-4 rounded-xl shadow-lg transform scale-110 animate-bounce">
-                                            {currentCelebrity.name}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+        /**
+         * 根據遊戲索引 (0-19) 計算其在 6x6 Grid 中的明確定位。
+         * Grid Area 格式: 'row_start / col_start / row_end / col_end'
+         * @param {number} index 遊戲格子索引 (0-19)。
+         * @returns {string} CSS grid-area 屬性值。
+         */
+        function calculateGridArea(index) {
+            const BOARD_SIZE = 6;
+            let row, col;
 
-                            <div className="p-6">
-                                <div className="flex justify-center gap-2 mb-6">
-                                    {[0, 1, 2].map((s) => (
-                                        <div 
-                                            key={s} 
-                                            className={`h-2 rounded-full transition-all duration-300 ${
-                                                s === Math.min(step, 2) ? 'w-8 bg-indigo-600' : 'w-2 bg-gray-300'
-                                            }`}
-                                        />
-                                    ))}
-                                    <div className={`h-2 rounded-full transition-all duration-300 ${
-                                        step === 3 ? 'w-8 bg-green-500' : 'w-2 bg-gray-300'
-                                    }`} />
-                                </div>
+            if (index >= 0 && index <= 5) { // 頂部行 (G0-G5)
+                row = 1;
+                col = index + 1;
+            } else if (index >= 6 && index <= 9) { // 右側欄 (G6-G9)
+                row = index - 6 + 2; // G6 -> R2, G9 -> R5
+                col = BOARD_SIZE;
+            } else if (index >= 10 && index <= 15) { // 底部行 (G10-G15)
+                row = BOARD_SIZE;
+                col = BOARD_SIZE - (index - 10); // G10 -> C6, G15 -> C1
+            } else if (index >= 16 && index <= 19) { // 左側欄 (G16-G19)
+                row = BOARD_SIZE - (index - 16) - 1; // G16 -> R5, G19 -> R2
+                col = 1;
+            } else {
+                return '1 / 1 / 1 / 1'; // 預防錯誤
+            }
 
-                                {renderControls()}
-                            </div>
-                        </div>
-                        
-                        {step < 3 && (
-                            <div className="mt-8 text-gray-400 text-sm max-w-md text-center">
-                                提示：根據畫面上的照片，讓大家猜猜看是誰，猜不出來就按提示！
-                            </div>
-                        )}
-                    </div>
-                );
+            return `${row} / ${col} / ${row + 1} / ${col + 1}`;
+        }
+
+
+        /** 繪製棋盤。 將 20 個格子配置到 6x6 佈局的外圍。
+         */
+        function renderBoard() {
+            const boardEl = document.getElementById('game-board');
+            boardEl.innerHTML = '';
+            
+            // --- Square Coloring based on Type (Rich & Vibrant) ---
+            const colorMap = {
+                // 起點 - 鮮綠色/石灰綠
+                start: 'bg-lime-300 border-lime-600 hover:bg-lime-400', 
+                // 任務格 - 活潑粉/紫
+                task: 'bg-pink-200 border-pink-500 hover:bg-pink-300',  
+                // 休息站 - 天藍色
+                rest: 'bg-sky-200 border-sky-500 hover:bg-sky-300',  
+                // 加分格 - 暖橙色
+                bonus: 'bg-orange-300 border-orange-600 hover:bg-orange-400',   
             };
+            
+            // 1. 渲染中央控制台 (佔據 R2-R5, C2-C5)
+            const centerEl = document.createElement('div');
+            centerEl.classList.add('center-control-block');
+            // 更新 dice-display 內容和步數上限文字
+            centerEl.innerHTML = `
+                <h2 class="text-3xl font-black mb-4 text-blue-700">擲骰中心</h2>
 
-            return (
-                <React.Fragment>
-                    {renderScreen()}
-                </React.Fragment>
-            );
-        };
+                <!-- 卡片按鈕區域 (新增) -->
+                <div class="mt-4 flex space-x-3 w-full justify-center">
+                    <button id="use-attack-card-btn" onclick="openAttackModal()" class="flex items-center space-x-2 p-3 rounded-xl font-bold transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700 text-white shadow-lg">
+                        <i data-lucide="bomb" class="w-5 h-5"></i>
+                        <span>攻擊卡</span> (<span id="attack-card-count">0</span>)
+                    </button>
+                    <button id="use-special-card-btn" onclick="useSpecialCard()" class="flex items-center space-x-2 p-3 rounded-xl font-bold transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-yellow-500 hover:bg-yellow-600 text-gray-900 shadow-lg">
+                        <i data-lucide="sparkles" class="w-5 h-5"></i>
+                        <span>特殊卡</span> (<span id="special-card-count">0</span>)
+                    </button>
+                </div>
+                <!-- 結束 卡片按鈕區域 -->
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<GuessWhoGame />);
+                <button id="roll-dice-btn" onclick="rollDice()" class="flex flex-col items-center justify-center w-40 h-40 bg-red-600 hover:bg-red-700 text-white font-bold rounded-3xl shadow-2xl transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed p-2 mt-6">
+                    <div id="dice-display" class="dice-face mb-2 text-5xl font-black text-red-600">
+                        ? 
+                    </div>
+                    <span id="dice-value" class="text-2xl font-black mt-1">擲骰</span>
+                </button>
+                <span class="text-xl mt-3 text-gray-600">目前步數上限: ${MAX_DICE_ROLL} 步</span>
+            `;
+            boardEl.appendChild(centerEl);
+
+
+            // 2. 渲染 20 個棋盤格子 (使用明確的 grid-area 定位)
+            gameBoard.forEach((square, gameBoardIndex) => {
+                const squareEl = document.createElement('div');
+                
+                const colorClasses = colorMap[square.type];
+                const gridArea = calculateGridArea(gameBoardIndex);
+                
+                squareEl.classList.add('board-square', 'shadow-lg', 'rounded-xl', ...colorClasses.split(' '));
+                squareEl.id = `square-${gameBoardIndex}`;
+                squareEl.style.gridArea = gridArea;
+                
+                // 動態生成 Lucide 圖標的 SVG
+                const iconGenerator = iconMap[square.icon];
+                const iconSvg = iconGenerator 
+                    ? iconGenerator.toSvg({ class: 'w-10 h-10 text-gray-800' }) 
+                    : '<div class="w-10 h-10 text-red-700">?</div>'; 
+
+                const squareNumber = gameBoardIndex === 0 ? 'GO!' : gameBoardIndex;
+
+                squareEl.innerHTML = `
+                    <!-- 格子編號 (連續編號 - 強化顯示) -->
+                    <div class="square-number">
+                        ${squareNumber}
+                    </div>
+                    <div class="flex flex-col items-center justify-center flex-grow">
+                        ${iconSvg}
+                        <!-- 格子名稱 -->
+                        <span class="text-base mt-1 font-extrabold text-gray-700">${square.name}</span>
+                    </div>
+                    <div id="markers-${gameBoardIndex}" class="flex justify-end items-center h-5 w-full"></div>
+                `;
+                
+                boardEl.appendChild(squareEl);
+            });
+            
+            renderMarkers();
+            updateCardButtons(); // 初始化卡片按鈕狀態
+        }
+
+        /** * 繪製棋子標記。 
+         */
+        function renderMarkers() {
+            gameBoard.forEach((_, index) => {
+                const markerContainer = document.getElementById(`markers-${index}`);
+                if (markerContainer) {
+                    markerContainer.innerHTML = '';
+                }
+            });
+
+            groups.forEach((group, id) => {
+                const markerContainer = document.getElementById(`markers-${group.position}`);
+                if (markerContainer) {
+                    const markerEl = document.createElement('div');
+                    markerEl.classList.add('marker', `group-${id + 1}`);
+                    markerContainer.appendChild(markerEl);
+                }
+            });
+
+            // 高亮顯示當前格子
+            document.querySelectorAll('.board-square').forEach(el => el.classList.remove('active'));
+            if (groups.length > 0) {
+                const currentSquare = document.getElementById(`square-${groups[currentGroupIndex].position}`);
+                if (currentSquare) {
+                    currentSquare.classList.add('active');
+                    // 根據當前格子的顏色調整邊框顏色，讓高亮更明顯 (使用黃色來保持活潑)
+                    currentSquare.style.borderColor = '#fbbf24'; 
+                }
+            }
+        }
+
+        /** * 繪製分數板。
+         */
+        function renderScoreBoard() {
+            groups.sort((a, b) => b.score - a.score); // 高分在前
+            const scoreBoardEl = document.getElementById('score-board');
+            scoreBoardEl.innerHTML = groups.map((group, index) => {
+                let colorClass = '';
+                if (index === 0) colorClass = 'bg-yellow-300 text-yellow-900 border-yellow-600';
+                else if (index === 1) colorClass = 'bg-gray-300 text-gray-900 border-gray-600';
+                else colorClass = 'bg-white text-gray-700 border-gray-400';
+
+                // 根據組名找到原始 ID 來確定棋子顏色
+                const originalId = groups.findIndex(g => g.name === group.name);
+                const markerColorClass = `group-${groups.findIndex(g => g.name === group.name) + 1}`;
+
+                return `
+                    <div class="flex flex-col p-4 rounded-xl border-b-8 ${colorClass} shadow-md">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <!-- 排名 -->
+                                <span class="text-2xl font-black mr-3 w-8 text-center">${index + 1}.</span>
+                                <div class="w-6 h-6 rounded-full mr-3 border-3 border-white shadow-xl ${markerColorClass}"></div>
+                                <!-- 組名 -->
+                                <span class="text-xl font-black">${group.name}</span>
+                            </div>
+                            <!-- 分數 -->
+                            <span class="text-4xl font-black">${group.score}</span>
+                        </div>
+                        <!-- 卡片數量顯示 (新增) -->
+                        <div class="flex justify-end space-x-4 text-lg font-bold mt-2 pr-4">
+                            <span title="攻擊卡片" class="flex items-center text-red-700">🔪 ${group.attackCards}</span>
+                            <span title="特殊卡片" class="flex items-center text-yellow-700">⭐ ${group.specialCards}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        /**
+         * 更新卡片按鈕的狀態和數量顯示。
+         */
+        function updateCardButtons() {
+            const currentGroup = groups[currentGroupIndex];
+            const attackBtn = document.getElementById('use-attack-card-btn');
+            const specialBtn = document.getElementById('use-special-card-btn');
+            const attackCountEl = document.getElementById('attack-card-count');
+            const specialCountEl = document.getElementById('special-card-count');
+
+            if (attackBtn && specialBtn) {
+                // 擲骰後卡片禁用
+                attackBtn.disabled = currentGroup.attackCards === 0 || isDiceRolled;
+                specialBtn.disabled = currentGroup.specialCards === 0 || isDiceRolled || isDoublePointsActive; // 不能重複使用雙倍卡
+            }
+            if (attackCountEl) attackCountEl.textContent = currentGroup.attackCards;
+            if (specialCountEl) specialCountEl.textContent = currentGroup.specialCards;
+        }
+
+        /**
+         * 顯示遊戲訊息。
+         * @param {string} message 要顯示的訊息。
+         */
+        function setGameMessage(message) {
+            document.getElementById('game-message').textContent = message;
+        }
+
+        /**
+         * 顯示當前回合。
+         */
+        function updateTurnDisplay() {
+            const currentGroup = groups[currentGroupIndex];
+            document.getElementById('current-group-name').textContent = currentGroup.name;
+        }
+
+        // =================================================================
+        // 🎮 Game Logic Functions
+        // =================================================================
+
+        /**
+         * 初始化遊戲狀態和 UI。
+         */
+        function startGame() {
+            const groupNames = [];
+            for (let i = 1; i <= 4; i++) {
+                const name = document.getElementById(`group-${i}`).value.trim();
+                if (name) {
+                    groupNames.push(name);
+                }
+            }
+
+            if (groupNames.length < 2) {
+                document.getElementById('setup-error').classList.remove('hidden');
+                return;
+            }
+
+            groups = groupNames.map((name, index) => ({
+                id: index + 1,
+                name: name,
+                score: 0,
+                position: 0,
+                attackCards: 1, // 初始一張攻擊卡
+                specialCards: 1, // 初始一張特殊卡
+            }));
+
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+
+            renderBoard();
+            renderScoreBoard();
+            updateTurnDisplay();
+            setGameMessage(`遊戲開始！${groups[currentGroupIndex].name} 請擲骰子或使用卡片。`);
+        }
+
+        /**
+         * 擲骰子並移動棋子。
+         */
+        async function rollDice() {
+            if (isDiceRolled || groups.length === 0) return;
+
+            isDiceRolled = true;
+            const rollDiceBtn = document.getElementById('roll-dice-btn');
+            rollDiceBtn.disabled = true;
+            updateCardButtons(); // 擲骰後禁用卡片
+
+            const diceDisplayEl = document.getElementById('dice-display');
+            const diceValueEl = document.getElementById('dice-value');
+            
+            // 開始擲骰動畫
+            diceDisplayEl.classList.add('dice-rolling');
+            diceValueEl.textContent = '轉動中...';
+            diceDisplayEl.textContent = '...'; 
+
+            setGameMessage(`🎲 ${groups[currentGroupIndex].name} 正在擲骰...`);
+
+            // 檢查是否有速度限制效果
+            const currentGroupId = groups[currentGroupIndex].id;
+            const speedLimitEffect = activeEffects.find(e => e.groupId === currentGroupId && e.type === 'speed_limit');
+            
+            let currentMaxRoll = MAX_DICE_ROLL;
+            if (speedLimitEffect) {
+                currentMaxRoll = speedLimitEffect.value; // speedLimitEffect.value is 5
+                // 移除效果，因為只作用一回合
+                activeEffects = activeEffects.filter(e => e !== speedLimitEffect); 
+                setGameMessage(`🚨 由於速度限制卡，${groups[currentGroupIndex].name} 擲骰上限為 ${currentMaxRoll} 點！`);
+            }
+            
+            // 模擬擲骰，數字為 1 到 currentMaxRoll
+            const roll = Math.floor(Math.random() * currentMaxRoll) + 1; 
+
+            await new Promise(resolve => setTimeout(resolve, 1500)); // 讓動畫跑完
+
+            // 停止擲骰動畫，顯示結果
+            diceDisplayEl.classList.remove('dice-rolling');
+            diceDisplayEl.textContent = roll; // 直接顯示數字
+            diceValueEl.textContent = `${roll} 點`;
+            setGameMessage(`${groups[currentGroupIndex].name} 擲出了 ${roll} 點！`);
+
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+
+            moveGroup(roll);
+        }
+
+        /**
+         * 移動當前組別的棋子。
+         * @param {number} steps 移動步數。
+         */
+        function moveGroup(steps) {
+            const currentGroup = groups[currentGroupIndex];
+            
+            // 處理移動，環繞棋盤
+            let newPosition = currentGroup.position + steps;
+            let passedStart = false;
+            
+            if (newPosition >= gameBoard.length) {
+                passedStart = true;
+                newPosition = newPosition % gameBoard.length;
+            }
+
+            currentGroup.position = newPosition;
+            groups[currentGroupIndex] = currentGroup;
+            
+            renderMarkers(); // 重新繪製棋子
+
+            if (passedStart) {
+                currentGroup.score += 5; // 經過起點獎勵 5 分
+                setGameMessage(`${currentGroup.name} 經過起點，獲得 5 分獎勵！`);
+                renderScoreBoard();
+            }
+            
+            const landedSquare = gameBoard[newPosition];
+            
+            setTimeout(() => {
+                handleSquareAction(landedSquare);
+            }, 800);
+        }
+
+        // =================================================================
+        // 🃏 Card Logic Functions (新增)
+        // =================================================================
+
+        /**
+         * 特殊卡片：雙倍分數 (Double Points)。
+         * 效果：下一回合任務成功時獲得分數加倍。
+         */
+        function useSpecialCard() {
+            const currentGroup = groups[currentGroupIndex];
+            if (currentGroup.specialCards <= 0 || isDoublePointsActive || isDiceRolled) return;
+
+            currentGroup.specialCards--;
+            isDoublePointsActive = true;
+
+            setGameMessage(`✨ ${currentGroup.name} 使用了特殊卡片！下次任務成功分數將會加倍！`);
+            
+            renderScoreBoard();
+            updateCardButtons();
+        }
+
+        /**
+         * 攻擊卡片：速度限制 (Speed Limit)。
+         * 效果：對目標組別施加效果，使其下一回合擲骰上限為 5 點。
+         */
+        function openAttackModal() {
+            const currentGroup = groups[currentGroupIndex];
+            if (currentGroup.attackCards <= 0 || isDiceRolled) return;
+
+            const modal = document.getElementById('attack-modal');
+            const modalContent = document.getElementById('attack-modal-content');
+            
+            // 產生目標選擇按鈕
+            const targetButtons = groups.filter(g => g.id !== currentGroup.id).map(g => `
+                <button onclick="useAttackCard(${g.id})" class="p-4 rounded-xl bg-red-100 hover:bg-red-200 border-2 border-red-500 text-gray-800 font-bold text-lg transition duration-200 shadow-md">
+                    攻擊 ${g.name}
+                </button>
+            `).join('');
+
+            modalContent.innerHTML = `
+                <h2 class="text-3xl font-bold text-red-600 mb-4">使用攻擊卡片：速度限制 (Max 5)</h2>
+                <p class="text-xl text-gray-700 mb-6">選擇你要影響的目標組別，將其下一回合擲骰上限限制為 5 點。</p>
+                <div class="flex flex-wrap gap-4 justify-center">
+                    ${targetButtons}
+                </div>
+                <button onclick="document.getElementById('attack-modal').classList.remove('flex'); document.getElementById('attack-modal').classList.add('hidden');" class="mt-6 w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 rounded-xl">
+                    取消
+                </button>
+            `;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        /**
+         * 執行攻擊卡片效果。
+         * @param {number} targetId 目標組別的 ID。
+         */
+        function useAttackCard(targetId) {
+            const currentGroup = groups[currentGroupIndex];
+            const targetGroup = groups.find(g => g.id === targetId);
+            
+            if (!targetGroup || currentGroup.attackCards <= 0) return;
+
+            currentGroup.attackCards--;
+
+            // 實施速度限制效果: 最大點數為 5
+            activeEffects.push({ groupId: targetId, type: 'speed_limit', value: 5 });
+            
+            setGameMessage(`⚔️ ${currentGroup.name} 對 ${targetGroup.name} 使用了【速度限制卡】！`);
+            
+            // 關閉模態視窗並更新 UI
+            document.getElementById('attack-modal').classList.remove('flex');
+            document.getElementById('attack-modal').classList.add('hidden');
+            renderScoreBoard();
+            updateCardButtons();
+        }
+
+
+        // =================================================================
+        // ✨ LLM Integration Functions
+        // =================================================================
+
+        /**
+         * 呼叫 Gemini API 生成教練回饋訊息。
+         * @param {string} groupName 當前組名。
+         * @param {boolean} success 任務是否成功。
+         * @param {number} points 獲得的分數。
+         * @returns {Promise<string>} 教練回饋訊息。
+         */
+        async function generateCoachingFeedback(groupName, success, points) {
+            const outcome = success ? `成功完成任務，獲得 ${points} 分` : '未能完成任務，沒有得分';
+            
+            const systemPrompt = `你是一位熱情、積極、且充滿鼓勵的長者運動教練。請根據提供的結果，生成一句簡短（不超過兩行）、中文的、非常積極的鼓勵或回饋訊息。`;
+            
+            const userQuery = `「${groupName}」這組剛剛${outcome}。請給他們一個正面的、激勵人心的回饋。`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+            
+            try {
+                const result = await fetchWithRetry(payload);
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                return text || "教練為您加油！表現很棒！";
+            } catch (error) {
+                console.error("生成教練回饋失敗:", error);
+                return "教練系統發生故障，但你們的努力值得稱讚！";
+            }
+        }
+        
+        /**
+         * 呼叫 Gemini API 生成運動任務。
+         * @param {string} locationName 棋盤上的地點名稱。
+         */
+        async function generateFitnessTask(locationName) {
+            
+            const systemPrompt = `你是一個專業的長者運動指導員。請根據以下地點名稱，設計一個適合長者（特別是坐姿或低衝擊）的互動式體適能或認知任務。任務說明必須是詳細的中文指令。請以 JSON 格式輸出。`;
+            
+            const userQuery = `為長者設計一個任務，地點是「${locationName}」。任務類型應為：手臂伸展、抬膝運動、深呼吸、記憶力挑戰、平衡訓練、或反應力遊戲。`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            taskName: { type: "STRING", description: "Interactive exercise name in Traditional Chinese." },
+                            instruction: { type: "STRING", description: "Detailed instruction for the senior group, including repetitions or duration, in Traditional Chinese. e.g., 請坐直，雙手伸直向前推，維持 5 秒，重複 8 次。" },
+                            points: { type: "NUMBER", description: "Points awarded upon successful completion (between 10 and 50)." }
+                        },
+                        required: ["taskName", "instruction", "points"]
+                    }
+                }
+            };
+            
+            try {
+                const result = await fetchWithRetry(payload);
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (jsonText) {
+                    currentTask = JSON.parse(jsonText);
+                    
+                    // LLM 生成的任務名稱
+                    document.getElementById('task-title').textContent = `✨ ${currentTask.taskName}`; 
+                    document.getElementById('task-instruction').textContent = currentTask.instruction;
+                    document.getElementById('task-points').textContent = currentTask.points;
+
+                    document.getElementById('task-loading').classList.add('hidden');
+                    document.getElementById('task-content').classList.remove('hidden');
+
+                } else {
+                    throw new Error("API 返回的 JSON 內容無效。");
+                }
+            } catch (error) {
+                console.error("處理任務生成響應時出錯:", error);
+                throw error;
+            }
+        }
+
+        /**
+         * 處理棋子停留的格子事件。
+         * @param {Object} square 停留的格子物件。
+         */
+        async function handleSquareAction(square) {
+            const currentGroup = groups[currentGroupIndex];
+            setGameMessage(`停留在: ${square.name}`);
+
+            if (square.type === 'task' || square.type === 'bonus' || square.type === 'start') {
+                if (square.type === 'start' && currentGroup.position === 0) {
+                    setGameMessage(`${currentGroup.name} 回到起點！準備下一回合。`);
+                    setTimeout(() => nextTurnCleanup(), 2000); // 這裡改為 nextTurnCleanup 確保狀態重置
+                    return;
+                }
+                
+                // --- 處理機會卡 (Chance) 邏輯 ---
+                if (square.name === '機會卡 (Chance)') {
+                    const cardType = Math.random() < 0.5 ? 'attack' : 'special';
+                    
+                    if (cardType === 'attack') {
+                        currentGroup.attackCards++;
+                        setGameMessage(`${currentGroup.name} 獲得一張 🔪 攻擊卡！`);
+                    } else {
+                        currentGroup.specialCards++;
+                        setGameMessage(`${currentGroup.name} 獲得一張 ⭐ 特殊卡！`);
+                    }
+                    renderScoreBoard();
+                    
+                    // 獲得卡片後直接進入下一回合
+                    setTimeout(() => nextTurnCleanup(), 2000);
+                    return; 
+                }
+                // --- 結束機會卡邏輯 ---
+
+
+                // 顯示任務模態視窗
+                document.getElementById('task-modal').classList.remove('hidden');
+                document.getElementById('task-modal').classList.add('flex');
+                
+                document.getElementById('landed-square-name').textContent = square.name;
+                document.getElementById('task-loading').classList.remove('hidden');
+                document.getElementById('task-content').classList.add('hidden');
+                document.getElementById('task-error-message').classList.add('hidden');
+
+                try {
+                    await generateFitnessTask(square.name);
+                } catch (e) {
+                    console.error("生成任務失敗:", e);
+                    document.getElementById('task-loading').classList.add('hidden');
+                    document.getElementById('task-error-message').classList.remove('hidden');
+                    
+                    // 如果 API 失敗，自動進行下一回合
+                    nextTurnCleanup();
+                }
+
+            } else if (square.type === 'rest') {
+                setGameMessage(`${currentGroup.name} 進入 ${square.name}，休息一回合！`);
+                // 休息不加分，直接換下一組
+                setTimeout(() => nextTurnCleanup(), 2000);
+            } 
+        }
+
+        /**
+         * 處理任務完成或失敗。
+         * @param {boolean} success 任務是否成功完成。
+         */
+        async function completeTask(success) {
+            const currentGroup = groups[currentGroupIndex];
+            const controlMsgEl = document.getElementById('control-panel-message');
+            
+            const pointsAwarded = success && currentTask ? currentTask.points : 0;
+            const taskName = currentTask ? currentTask.taskName : '運動挑戰';
+            let finalPoints = pointsAwarded; // 初始分數
+            
+            if (success && currentTask) {
+                if (isDoublePointsActive) {
+                    finalPoints *= 2; // 雙倍效果
+                    setGameMessage(`${currentGroup.name} 成功完成「${taskName}」並啟動雙倍效果，獲得 ${finalPoints} 分！`);
+                    isDoublePointsActive = false; // 重設雙倍效果
+                } else {
+                    setGameMessage(`${currentGroup.name} 成功完成「${taskName}」，獲得 ${finalPoints} 分！`);
+                }
+                currentGroup.score += finalPoints;
+            } else {
+                setGameMessage(`${currentGroup.name} 未能完成任務，準備接收教練回饋...`);
+            }
+            
+            // --- LLM Feature 2: AI 教練回饋生成 ---
+            controlMsgEl.innerHTML = `
+                <div class="flex items-center justify-center space-x-2 text-xl font-bold text-green-700 mt-4">
+                    <i data-lucide="sparkles" class="w-6 h-6 text-yellow-500"></i>
+                    <span>AI 教練回饋中...</span>
+                </div>
+            `;
+            
+            const feedback = await generateCoachingFeedback(currentGroup.name, success, finalPoints);
+            
+            controlMsgEl.innerHTML = `
+                <div class="mt-4 p-3 bg-blue-50 border-l-4 border-blue-500 rounded-lg text-gray-800 font-medium">
+                    <span class="font-black text-blue-600">✨ AI 教練：</span> ${feedback}
+                </div>
+            `;
+            // --- 結束 LLM Feature 2 ---
+
+            // 清空任務並關閉模態視窗
+            currentTask = null;
+            document.getElementById('task-modal').classList.add('hidden');
+            document.getElementById('task-modal').classList.remove('flex');
+
+            // 更新分數
+            renderScoreBoard();
+
+            // 延遲一段時間讓使用者閱讀回饋 (5秒)，然後進入下一回合
+            setTimeout(() => {
+                controlMsgEl.textContent = '請在中央按鈕處擲骰。';
+                nextTurnCleanup();
+            }, 5000); 
+        }
+
+        /**
+         * 清理狀態，準備下一回合。
+         */
+        function nextTurnCleanup() {
+            // 準備下一回合的狀態重置
+            isDiceRolled = false;
+            const rollDiceBtn = document.getElementById('roll-dice-btn');
+            if (rollDiceBtn) rollDiceBtn.disabled = false;
+            const diceDisplayEl = document.getElementById('dice-display');
+            if (diceDisplayEl) diceDisplayEl.textContent = '?'; // 重置為問號
+            const diceValueEl = document.getElementById('dice-value');
+            if (diceValueEl) diceValueEl.textContent = '擲骰';
+            
+            nextTurn();
+        }
+
+        /**
+         * 移至下一組。
+         */
+        function nextTurn() {
+            // 檢查是否有足夠的分數來決定是否結束遊戲
+            if (groups.some(g => g.score >= 200)) { // 範例結束條件：任一組達到 200 分
+                showGameOver();
+                return;
+            }
+
+            currentGroupIndex = (currentGroupIndex + 1) % groups.length;
+            updateTurnDisplay();
+            setGameMessage(`現在輪到 ${groups[currentGroupIndex].name} 擲骰子或使用卡片。`);
+            renderMarkers(); // 確保高亮顯示新組的位置
+            updateCardButtons(); // 更新新組別的卡片按鈕狀態
+        }
+
+        /**
+         * 顯示遊戲結束畫面。
+         */
+        function showGameOver() {
+            groups.sort((a, b) => b.score - a.score);
+            const winner = groups[0];
+            const finalWinnerEl = document.getElementById('final-winner');
+            
+            finalWinnerEl.innerHTML = `恭喜 🏆 <span class="text-red-600">${winner.name}</span> 以 ${winner.score} 分獲得勝利！`;
+
+            document.getElementById('game-over-modal').classList.remove('hidden');
+            document.getElementById('game-over-modal').classList.add('flex');
+        }
+
+        // =================================================================
+        // 🚀 Initialization
+        // =================================================================
+        
+        // 暴露全域函數給 HTML 元素使用
+        window.startGame = startGame;
+        window.rollDice = rollDice;
+        window.completeTask = completeTask;
+        window.useSpecialCard = useSpecialCard; // 新增
+        window.openAttackModal = openAttackModal; // 新增
+        window.useAttackCard = useAttackCard; // 新增
+
+        
     </script>
 </body>
 </html>
